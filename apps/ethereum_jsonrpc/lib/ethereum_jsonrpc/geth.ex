@@ -5,7 +5,7 @@ defmodule EthereumJSONRPC.Geth do
 
   import EthereumJSONRPC, only: [id_to_params: 1, json_rpc: 2, request: 1]
 
-  alias EthereumJSONRPC.Geth.Calls
+  alias EthereumJSONRPC.Geth.{Calls, Tracer}
 
   @behaviour EthereumJSONRPC.Variant
 
@@ -59,7 +59,7 @@ defmodule EthereumJSONRPC.Geth do
   @tracer File.read!(@tracer_path)
 
   defp debug_trace_transaction_request(%{id: id, hash_data: hash_data}) do
-    request(%{id: id, method: "debug_traceTransaction", params: [hash_data, %{tracer: @tracer}]})
+    request(%{id: id, method: "debug_traceTransaction", params: [hash_data, %{}]})
   end
 
   defp debug_trace_transaction_responses_to_internal_transactions_params(responses, id_to_params)
@@ -67,6 +67,11 @@ defmodule EthereumJSONRPC.Geth do
     responses
     |> Enum.map(&debug_trace_transaction_response_to_internal_transactions_params(&1, id_to_params))
     |> reduce_internal_transactions_params()
+  end
+
+  defp debug_trace_transaction_response_to_internal_transactions_params(%{id: id, result: %{"structLogs" => logs}}, id_to_params)
+       when is_map(id_to_params) and is_list(logs) do
+    debug_trace_transaction_response_to_internal_transactions_params(%{id: id, result: Tracer.replay(logs)}, id_to_params)
   end
 
   defp debug_trace_transaction_response_to_internal_transactions_params(%{id: id, result: calls}, id_to_params)
